@@ -1,5 +1,6 @@
 import twitter from "npm:twitter-text@3.1.0";
 import { CONFIG } from "./config.ts";
+import {BLUE_VERIFIED_EMOJI, PISS_VERIFIED_EMOJI, VERIFIED_EMOJI} from "./utils/apiUtil.ts";
 
 const MONTHS: Record<string, string> = {
     'Jan': '01',
@@ -138,6 +139,20 @@ export function userToAccount(user: Record<string, any>): Record<string, any> {
     account.statuses_count = user.statuses_count;
     account.followers_count = user.followers_count;
     account.following_count = user.friends_count;
+    account.emojis = [];
+
+    if (user.ext_is_blue_verified) {
+        account.emojis.push(BLUE_VERIFIED_EMOJI);
+        account.display_name += ` :${BLUE_VERIFIED_EMOJI.shortcode}:`;
+    } else if (user.verified) {
+        if (user.ext_verified_type === 'Business') {
+            account.emojis.push(PISS_VERIFIED_EMOJI);
+            account.display_name += ` :${PISS_VERIFIED_EMOJI.shortcode}:`;
+        } else {
+            account.emojis.push(VERIFIED_EMOJI);
+            account.display_name += ` :${VERIFIED_EMOJI.shortcode}:`;
+        }
+    }
 
     return account;
 }

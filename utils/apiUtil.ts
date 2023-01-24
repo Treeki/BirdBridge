@@ -1,5 +1,28 @@
 // @deno-types="npm:@types/express@4.17.15"
 import express from "npm:express@4.18.2";
+import {CONFIG} from "../config.ts";
+
+export const BLUE_VERIFIED_EMOJI = {
+    shortcode: 'blue_verified',
+    url: new URL('/static/blue_verified.png', CONFIG.root).toString(),
+    static_url: new URL('/static/blue_verified.png', CONFIG.root).toString(),
+    visible_in_picker: false,
+    category: 'Icons'
+};
+export const VERIFIED_EMOJI = {
+    shortcode: 'verified',
+    url: new URL('/static/verified.png', CONFIG.root).toString(),
+    static_url: new URL('/static/verified.png', CONFIG.root).toString(),
+    visible_in_picker: false,
+    category: 'Icons'
+};
+export const PISS_VERIFIED_EMOJI = {
+    shortcode: 'piss_verified',
+    url: new URL('/static/piss_verified.png', CONFIG.root).toString(),
+    static_url: new URL('/static/piss_verified.png', CONFIG.root).toString(),
+    visible_in_picker: false,
+    category: 'Icons'
+};
 
 export function buildParams(isTweet: boolean): Record<string, any> {
     const params: Record<string, any> = {
@@ -9,6 +32,7 @@ export function buildParams(isTweet: boolean): Record<string, any> {
         include_user_entities: '1',
         include_ext_trusted_friends_metadata: 'true',
         include_ext_verified_type: 'true',
+        include_ext_is_blue_verified: 'true',
         include_ext_vibe: 'true',
         include_ext_alt_text: 'true',
         include_composer_source: 'true',

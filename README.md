@@ -14,6 +14,10 @@ Tested with: [Pinafore](https://pinafore.social/), [Elk](https://elk.zone/), [Iv
 - A server with a SSL certificate and a subdomain
 - API keys that have fallen off the back of a truck
 
+## Acknowledgements
+
+- Nerd verification icon (used for people who have Twitter Blue) from [@shadowbIood@twitter.com](https://twitter.com/shadowbIood/status/1590462560515473409)
+
 ## Twitter Features
 
 | Feature                | Status | Notes                                                                                                                                       |
@@ -37,7 +41,7 @@ Tested with: [Pinafore](https://pinafore.social/), [Elk](https://elk.zone/), [Iv
 | Pinned Tweets          | 🔶     | Pinned tweets will appear on profiles, but you cannot pin or unpin a tweet                                                                  |
 | Circle Tweets          | 🔶     | Circle tweets have a CW/spoiler attached to denote that they're special. Circle tweets cannot be posted yet                                 |
 | Reply Controls         | ❌      | Not sure how to translate this to Mastodon - I'm using the toot privacy flag to denote protected accounts                                   |
-| Verified Display       | ❌      | This could probably be implemented using fake custom emoji                                                                                  |
+| Verified Display       | ✅      | Verification status is shown as custom emoji                                                                                                |
 | Follow/Unfollow        | ❌      |                                                                                                                                             |
 | Block/Unblock          | ❌      | Blocks will be respected but cannot be modified yet                                                                                         |
 | Disable Retweets       | ❌      | Setting respected (this is handled by Twitter's servers) but cannot be modified yet                                                         |

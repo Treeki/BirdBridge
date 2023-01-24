@@ -5,7 +5,13 @@ import multer from "npm:multer@1.4.5-lts.1";
 import cors from "npm:cors@2.8.5";
 import {userToAccount, tweetToToot, activityToNotification} from "./conversion.ts";
 import {OAuth} from "./utils/oauth.ts";
-import {addPageLinksToResponse, buildParams, injectPagingInfo} from "./utils/apiUtil.ts";
+import {
+    addPageLinksToResponse,
+    BLUE_VERIFIED_EMOJI,
+    buildParams,
+    injectPagingInfo,
+    PISS_VERIFIED_EMOJI, VERIFIED_EMOJI
+} from "./utils/apiUtil.ts";
 import {UserCache} from "./utils/userCache.ts";
 import {CONFIG} from "./config.ts";
 import {setup as setupAuthflow} from "./apis/authflow.ts";
@@ -27,6 +33,7 @@ app.use(upload.none());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cors());
+app.use('/static', express.static(new URL('static', import.meta.url).pathname));
 
 app.use((req, res, next) => {
     // Inject query params into the body
@@ -182,11 +189,34 @@ app.get('/api/v1/timelines/home', async (req, res) => {
     res.send(toots);
 });
 
+function isMentionsTimelineQuery(data: any): boolean {
+    if (data.types && Array.isArray(data.types)) {
+        // for Ivory
+        if (data.types.length === 1 && data.types[0] === 'mention')
+            return true;
+    } else if (data.exclude_types && Array.isArray(data.exclude_types)) {
+        // for Pinafore
+        const check = [
+            'follow', 'favourite', 'reblog', 'poll',
+            'admin.sign_up', 'update', 'follow_request', 'admin.report'
+        ];
+        if (data.exclude_types.length === check.length) {
+            for (let i = 0; i < check.length; i++) {
+                if (check[i] !== data.exclude_types[i])
+                    return false;
+            }
+            return true;
+        }
+    }
+
+    return false;
+}
+
 app.get('/api/v1/notifications', async (req, res) => {
     const params: Record<string, any> = buildParams(true);
     injectPagingInfo(req.body, params);
 
-    if (req.body.types && Array.isArray(req.body.types) && req.body.types.length === 1 && req.body.types[0] === 'mention') {
+    if (isMentionsTimelineQuery(req.body)) {
         // special case for 'mentions' timeline
         const twreq = await req.oauth!.request('GET', 'https://api.twitter.com/1.1/statuses/mentions_timeline.json', params);
         const mentions = await twreq.json();
@@ -229,9 +259,11 @@ app.get('/api/v1/notifications', async (req, res) => {
 app.get('/api/v1/follow_requests', (req, res) => {
     res.send([]);
 });
+
 app.get('/api/v1/custom_emojis', (req, res) => {
-    res.send([]);
+    res.send([VERIFIED_EMOJI, BLUE_VERIFIED_EMOJI, PISS_VERIFIED_EMOJI]);
 });
+
 app.get('/api/v1/filters', (req, res) => {
     res.send([]);
 });
