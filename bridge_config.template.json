@@ -1,0 +1,16 @@
+{
+  "headers": {
+    "X-Twitter-Active-User": "yes",
+    "X-Twitter-API-Version": "5",
+    "X-Twitter-Client": "Twitter-iPhone",
+    "X-Twitter-Client-DeviceID": "00000000-0000-0000-0000-000000000000",
+    "X-Twitter-Client-Language": "en",
+    "User-Agent": "Twitter-iPhone/9.41.1 iOS/16.2 (Apple;iPhone10,5;;;;;1;2017)"
+  },
+  "bridge_password": "[Password that will be required when signing into the bridge]",
+  "bridge_secret": "[Replace me with random data]",
+  "consumer_key": "[Replace me with a valid API key]",
+  "consumer_secret": "[Replace me with a valid API key secret]",
+  "root": "https://cool-subdomain.example.com",
+  "domain": "cool-subdomain.example.com"
+}
