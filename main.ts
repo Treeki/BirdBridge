@@ -29,27 +29,40 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cors());
 
 app.use((req, res, next) => {
+    // Inject query params into the body
+    if (req.body === null)
+        req.body = {};
+    for (const [key, value] of Object.entries(req.query)) {
+        req.body[key] = value;
+    }
+
     console.log('Request to', req.url);
     console.log('body:', req.body);
-    console.log('query:', req.query);
     next();
 });
 
 app.get('/api/v1/instance', (req, res) => {
     res.send({
         uri: CONFIG.domain,
-        domain: CONFIG.domain,
         title: 'Twitter',
-        version: '0.0.1',
-        source_url: 'http://example.com',
+        short_description: 'A lazy bridge to Twitter',
         description: 'A lazy bridge to Twitter',
-        usage: {users: {active_month: 1}},
-        thumbnail: {url: ''},
+        email: 'example@example.com',
+        version: '0.0.1',
+        urls: {
+            streaming_api: ''
+        },
+        stats: {
+            user_count: 1,
+            status_count: 99999,
+            domain_count: 1
+        },
+        // no thumbnail
         languages: ['en'],
+        registrations: false,
+        approval_required: true,
+        invites_enabled: false,
         configuration: {
-            urls: {
-                streaming: ''
-            },
             accounts: {
                 max_featured_tags: 0
             },
@@ -58,13 +71,16 @@ app.get('/api/v1/instance', (req, res) => {
                 max_media_attachments: 4,
                 characters_reserved_per_url: 23 // FIXME
             },
-            // TODO: media_attachments, polls, translation
+            polls: {
+                max_options: 4,
+                max_characters_per_option: 20, // FIXME
+                min_expiration: 1, // FIXME
+                max_expiration: 100000 // FIXME
+            }
+            // TODO: media_attachments
         },
-        registrations: {
-            enabled: false,
-            approval_required: true,
-            message: null
-        }
+        // TODO: contact_account
+        rules: []
     });
 });
 
@@ -88,7 +104,7 @@ app.get('/api/v1/timelines/home', async (req, res) => {
     const url = 'https://api.twitter.com/1.1/statuses/home_timeline.json';
     const params: Record<string, any> = buildParams(true);
     params.include_my_retweet = '1';
-    injectPagingInfo(req.query, params);
+    injectPagingInfo(req.body, params);
 
     // The Mastodon API offers more flexibility in paging than Twitter does, so we need to
     // play games in order to get refreshing in Ivory to work.
@@ -103,11 +119,11 @@ app.get('/api/v1/timelines/home', async (req, res) => {
     // just detect this case and do the backfilling ourselves.
 
     let tweets;
-    if (req.query.min_id !== undefined && req.query.max_id === undefined && req.query.since_id === undefined) {
+    if (req.body.min_id !== undefined && req.body.max_id === undefined && req.body.since_id === undefined) {
         // Ivory "get the latest posts" case detected
         tweets = [];
 
-        const lastRead = BigInt(req.query.min_id as string);
+        const lastRead = BigInt(req.body.min_id as string);
         let maxID: BigInt | null = null;
         params.limit = '200'; // we may as well load Twitter's maximum and save on requests!
         params.min_id = lastRead - 1n; // fetch the last read tweet as well
@@ -168,9 +184,9 @@ app.get('/api/v1/timelines/home', async (req, res) => {
 
 app.get('/api/v1/notifications', async (req, res) => {
     const params: Record<string, any> = buildParams(true);
-    injectPagingInfo(req.query, params);
+    injectPagingInfo(req.body, params);
 
-    if (req.query.types && Array.isArray(req.query.types) && req.query.types.length === 1 && req.query.types[0] === 'mention') {
+    if (req.body.types && Array.isArray(req.body.types) && req.body.types.length === 1 && req.body.types[0] === 'mention') {
         // special case for 'mentions' timeline
         const twreq = await req.oauth!.request('GET', 'https://api.twitter.com/1.1/statuses/mentions_timeline.json', params);
         const mentions = await twreq.json();
@@ -243,7 +259,7 @@ app.get('/api/v1/lists', async (req, res) => {
 app.get('/api/v1/timelines/list/:list_id(\\d+)', async (req, res) => {
     const params: Record<string, any> = buildParams(true);
     params.list_id = req.params.list_id;
-    injectPagingInfo(req.query, params);
+    injectPagingInfo(req.body, params);
 
     const twreq = await req.oauth!.request('GET', 'https://api.twitter.com/1.1/lists/statuses.json', params);
     const tweets = await twreq.json();
@@ -258,7 +274,7 @@ app.get('/api/v1/accounts/:id(\\d+)', async (req, res) => {
 });
 
 app.get('/api/v1/accounts/:id(\\d+)/statuses', async (req, res) => {
-    if (req.query.pinned) {
+    if (req.body.pinned) {
         const userCache = getUserCache(req.oauth!);
         const user = await userCache.fetchUser(req.params.id);
         const pinned = [];
@@ -282,7 +298,7 @@ app.get('/api/v1/accounts/:id(\\d+)/statuses', async (req, res) => {
 
     const params = buildParams(true);
     params.user_id = req.params.id;
-    injectPagingInfo(req.query, params);
+    injectPagingInfo(req.body, params);
 
     const twreq = await req.oauth!.request('GET', 'https://api.twitter.com/1.1/statuses/user_timeline.json', params);
     const tweets = await twreq.json();
@@ -293,8 +309,8 @@ app.get('/api/v1/accounts/:id(\\d+)/statuses', async (req, res) => {
 app.get('/api/v1/accounts/relationships', async (req, res) => {
     const results = [];
 
-    if (req.query.id) {
-        const ids = Array.isArray(req.query.id) ? req.query.id : [req.query.id];
+    if (req.body.id) {
+        const ids = Array.isArray(req.body.id) ? req.body.id : [req.body.id];
 
         if (ids.length > 1)
             console.warn(`WARNING: Got relationships query with ${ids.length} IDs`);
@@ -357,8 +373,8 @@ app.get('/api/v1/statuses/:id(\\d+)/context', async (req, res) => {
 
 app.get('/api/v2/search', async (req, res) => {
     // Ivory uses this to resolve an unknown toot
-    if (req.query.limit == '1' && req.query.resolve == '1' && req.query.type === 'statuses') {
-        const match = /^(.+)\/@([^/]+)\/(\d+)$/.exec(req.query.q as string);
+    if (req.body.limit == '1' && req.body.resolve == '1' && req.body.type === 'statuses') {
+        const match = /^(.+)\/@([^/]+)\/(\d+)$/.exec(req.body.q as string);
         if (match && match[1] === CONFIG.root) {
             const params = buildParams(true);
             params.id = match[3];

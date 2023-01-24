@@ -90,26 +90,27 @@ export function setup(app: express.Express) {
             website: req.body.website,
             redirect_uri: req.body.redirect_uris,
             client_id,
-            client_secret
+            client_secret,
+            vapid_key: '' // some clients want this field to exist
         });
     });
 
     app.get('/oauth/authorize', async (req, res) => {
         if (
-            typeof req.query.client_id !== 'string' ||
-            typeof req.query.redirect_uri !== 'string' ||
-            typeof req.query.scope !== 'string'
+            typeof req.body.client_id !== 'string' ||
+            typeof req.body.redirect_uri !== 'string' ||
+            typeof req.body.scope !== 'string'
         ) {
             res.sendStatus(400);
             return;
         }
 
-        const clientName = atob(req.query.client_id);
+        const clientName = atob(req.body.client_id);
         const signedStuff = await packObject<SignInFormData>({
             purpose: 'authorize',
-            clientId: req.query.client_id,
-            redirectUri: req.query.redirect_uri,
-            scope: req.query.scope
+            clientId: req.body.client_id,
+            redirectUri: req.body.redirect_uri,
+            scope: req.body.scope
         });
 
         // Present a cool page
@@ -168,7 +169,7 @@ export function setup(app: express.Express) {
 
     app.post('/oauth/token', async (req, res) => {
         // Verify the code blob
-        if (req.body.grant_type === 'authorization_code' && req.body.code) {
+        if (req.body.grant_type === 'authorization_code') {
             const code = await unpackObject<TokenRequestData>(req.body.code);
             if (code && code.purpose === 'token') {
                 const clientSecret = await makeClientSecret(code.clientId);
