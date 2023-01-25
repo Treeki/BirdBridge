@@ -53,6 +53,7 @@ Tested with: [Pinafore](https://pinafore.social/), [Elk](https://elk.zone/), [Iv
 
 - Reorganise the codebase
 - Implement more features
+- Sort threads correctly
 - Implement more Twitter Card types as Mastodon cards where I can
 - Implement entities for profile descriptions (e.g. clickable @ names)
 - Implement missing bits in existing features (alt text, voting in polls, etc)

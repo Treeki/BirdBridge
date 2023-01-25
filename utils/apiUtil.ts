@@ -24,6 +24,8 @@ export const PISS_VERIFIED_EMOJI = {
     category: 'Icons'
 };
 
+export const IMAGE_1PX = new URL('/static/1px.png', CONFIG.root).toString();
+
 export function buildParams(isTweet: boolean): Record<string, any> {
     const params: Record<string, any> = {
         include_cards: '1',

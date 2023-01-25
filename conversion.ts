@@ -1,6 +1,6 @@
 import twitter from "npm:twitter-text@3.1.0";
 import { CONFIG } from "./config.ts";
-import {BLUE_VERIFIED_EMOJI, PISS_VERIFIED_EMOJI, VERIFIED_EMOJI} from "./utils/apiUtil.ts";
+import {BLUE_VERIFIED_EMOJI, IMAGE_1PX, PISS_VERIFIED_EMOJI, VERIFIED_EMOJI} from "./utils/apiUtil.ts";
 
 const MONTHS: Record<string, string> = {
     'Jan': '01',
@@ -189,8 +189,21 @@ export function convertMedia(media: Record<string, any>): Record<string, any> {
     return attachment;
 }
 
-export function convertCard(card: Record<string, any>): Record<string, any> {
-    const pollMatch = /^poll(\d+)choice/.exec(card.name);
+function tryExpandURL(tcoUrl: string, extendedEntities: any): string {
+    // search through the url entities in a tweet to try and turn a t.co url into a full url
+    if (extendedEntities?.urls) {
+        for (const entity of extendedEntities.urls) {
+            if (entity.url === tcoUrl)
+                return entity.expanded_url;
+        }
+    }
+
+    // no luck
+    return tcoUrl;
+}
+
+export function convertCard(card: Record<string, any>, extendedEntities: any): Record<string, any> {
+    const pollMatch = card.name.match(/^poll(\d+)choice/);
     if (pollMatch) {
         const optionCount = parseInt(pollMatch[1], 10);
         const options = [];
@@ -220,8 +233,41 @@ export function convertCard(card: Record<string, any>): Record<string, any> {
             emojis: []
         };
 
-        console.log(poll);
-        return { poll };
+        return {poll};
+    } else if (card.name === 'summary' || card.name === 'summary_large_image') {
+        const newCard = {
+            url: tryExpandURL(card.binding_values.card_url.string_value, extendedEntities),
+            title: card.binding_values.title.string_value,
+            description: card.binding_values.description.string_value,
+            type: 'link',
+            author_name: '',
+            author_url: '',
+            provider_name: '',
+            provider_url: '',
+            html: '',
+            width: 1000,
+            height: 1,
+            // use a 1px image because Ivory won't render a card with no image
+            image: IMAGE_1PX,
+            embed_url: '',
+            blurhash: null
+        };
+
+        // the way that Ivory displays images is really obnoxious if they're square
+        // so, I'm making an executive decision to only show them if they're not too tall
+        try {
+            const image = card.binding_values.thumbnail_image_large;
+            const ratio = image.width / image.height;
+            if (ratio >= 1.5) {
+                newCard.width = image.width;
+                newCard.height = image.height;
+                newCard.image = image.url;
+            }
+        } catch (ex) {
+            console.warn(`error parsing thumbnail_image_large in card of type ${card.name}:`, ex);
+        }
+
+        return {card: newCard};
     } else {
         console.warn('Unhandled card', card);
         return {};
@@ -263,6 +309,10 @@ export function tweetToToot(tweet: Record<string, any>, globalObjects?: any): Re
         toot.favourites_count = 0;
         toot.content = '';
         toot.text = '';
+        if (tweet.retweeted_status.is_quote_status) {
+            // pull out the QT card for Ivory
+            toot.card = toot.reblog.card;
+        }
     } else {
         toot.reblog = null;
         toot.in_reply_to_id = tweet.in_reply_to_status_id_str;
@@ -283,24 +333,54 @@ export function tweetToToot(tweet: Record<string, any>, globalObjects?: any): Re
 
         // append quoted tweets, in lieu of a better option
         if (tweet.is_quote_status && tweet.quoted_status_permalink) {
-            let quote = tweet.quoted_status_permalink;
-            const match = /^https:\/\/twitter.com\/([^/]+)\/status\/(\d+)/.exec(quote.expanded);
+            const quote = tweet.quoted_status;
+            const quoteLink = tweet.quoted_status_permalink;
+            const match = /^https:\/\/twitter.com\/([^/]+)\/status\/(\d+)/.exec(quoteLink.expanded);
             if (match) {
-                quote.expanded = `${CONFIG.root}/@${match[1]}/${match[2]}`;
+                // rewriting the URL like this makes it clickable in Ivory
+                quoteLink.expanded = `${CONFIG.root}/@${match[1]}/${match[2]}`;
             }
-            const url = twitter.htmlEscape(quote.expanded);
-            const displayURL = twitter.htmlEscape(quote.display);
-            toot.content = toot.content + ` <a href="${url}" rel="nofollow noopener noreferrer" target="_blank">${displayURL}</a>`;
+
+            // can i use a card here?
+            if (quote) {
+                // annoyingly, Ivory won't show the description, which makes this far less useful than it could be
+                toot.card = {
+                    url: quoteLink.expanded,
+                    title: quote.user.name ? `🔁 ${quote.user.name} (@${quote.user.screen_name})` : `🔁 @${quote.user.screen_name}`,
+                    description: quote.full_text,
+                    type: 'link',
+                    author_name: '',
+                    author_url: '',
+                    provider_name: '',
+                    provider_url: '',
+                    html: '',
+                    width: 1000,
+                    height: 1,
+                    // use a 1px image because Ivory won't render a card with no image
+                    image: IMAGE_1PX,
+                    embed_url: '',
+                    blurhash: null
+                };
+            }
+
+            // always append a regular link because Ivory demands to see one anyway
+            // (unless there already was one!)
+            const url = twitter.htmlEscape(quoteLink.expanded);
+            if (!toot.content || !toot.content.includes(url)) {
+                const displayURL = twitter.htmlEscape(quoteLink.display);
+                toot.content = toot.content + ` <a href="${url}" rel="nofollow noopener noreferrer" target="_blank">${displayURL}</a>`;
+            }
         }
     }
-    // poll, card...
     toot.favourited = tweet.favorited;
     toot.reblogged = tweet.retweeted;
 
     if (tweet.card) {
-        const conv = convertCard(tweet.card);
+        const conv = convertCard(tweet.card, tweet.entities);
         if (conv.poll)
             toot.poll = conv.poll;
+        if (conv.card && !toot.card)
+            toot.card = conv.card;
     }
 
     if (tweet.limited_actions === 'limit_trusted_friends_tweet') {
