@@ -237,8 +237,8 @@ export function convertCard(card: Record<string, any>, extendedEntities: any): R
     } else if (card.name === 'summary' || card.name === 'summary_large_image') {
         const newCard = {
             url: tryExpandURL(card.binding_values.card_url.string_value, extendedEntities),
-            title: card.binding_values.title.string_value,
-            description: card.binding_values.description.string_value,
+            title: card.binding_values?.title?.string_value,
+            description: card.binding_values?.description?.string_value,
             type: 'link',
             author_name: '',
             author_url: '',
@@ -269,7 +269,7 @@ export function convertCard(card: Record<string, any>, extendedEntities: any): R
 
         return {card: newCard};
     } else {
-        console.warn('Unhandled card', card);
+        console.warn('Unhandled card', card.name);
         return {};
     }
 }
