@@ -5,6 +5,7 @@
     "X-Twitter-Client": "Twitter-iPhone",
     "X-Twitter-Client-DeviceID": "00000000-0000-0000-0000-000000000000",
     "X-Twitter-Client-Language": "en",
+    "X-Twitter-Client-Version": "9.41.1",
     "User-Agent": "Twitter-iPhone/9.41.1 iOS/16.2 (Apple;iPhone10,5;;;;;1;2017)"
   },
   "bridge_password": "[Password that will be required when signing into the bridge]",

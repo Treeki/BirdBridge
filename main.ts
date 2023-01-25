@@ -30,7 +30,20 @@ const app = express();
 const upload = multer();
 app.use(upload.none());
 
-app.use(express.json());
+declare global {
+    namespace Express {
+        export interface Request {
+            originalJsonBody?: Uint8Array
+        }
+    }
+}
+app.use(express.json({
+    verify: (req, _res, body, _encoding) => {
+        // a terrible, terrible hack that lets us get the original JSON later
+        req.originalJsonBody = body;
+    }
+}));
+
 app.use(express.urlencoded({ extended: true }));
 app.use(cors());
 app.use('/static', express.static(new URL('static', import.meta.url).pathname));
@@ -192,7 +205,8 @@ app.get('/api/v1/timelines/home', async (req, res) => {
 function isMentionsTimelineQuery(data: any): boolean {
     if (data.types && Array.isArray(data.types)) {
         // for Ivory
-        if (data.types.length === 1 && data.types[0] === 'mention')
+        if ((data.types.length === 1 && data.types[0] === 'mention') ||
+            (data.types.length === 2 && data.types[0] === 'mention' && data.types[1] === 'mention'))
             return true;
     } else if (data.exclude_types && Array.isArray(data.exclude_types)) {
         // for Pinafore
@@ -296,6 +310,7 @@ app.get('/api/v1/timelines/list/:list_id(\\d+)', async (req, res) => {
     const twreq = await req.oauth!.request('GET', 'https://api.twitter.com/1.1/lists/statuses.json', params);
     const tweets = await twreq.json();
     const toots = tweets.map(tweetToToot);
+    addPageLinksToResponse(new URL(req.originalUrl, CONFIG.root), toots as {id: string}[], res);
     res.send(toots);
 });
 
@@ -335,6 +350,7 @@ app.get('/api/v1/accounts/:id(\\d+)/statuses', async (req, res) => {
     const twreq = await req.oauth!.request('GET', 'https://api.twitter.com/1.1/statuses/user_timeline.json', params);
     const tweets = await twreq.json();
     const toots = tweets.map(tweetToToot);
+    addPageLinksToResponse(new URL(req.originalUrl, CONFIG.root), toots as {id: string}[], res);
     res.send(toots);
 });
 
@@ -378,7 +394,11 @@ app.get('/api/v1/statuses/:id(\\d+)', async (req, res) => {
     params.id = req.params.id;
     const twreq = await req.oauth!.request('GET', 'https://api.twitter.com/1.1/statuses/show.json', params);
     const tweet = await twreq.json();
-    res.send(tweetToToot(tweet));
+    if (twreq.status === 200) {
+        res.send(tweetToToot(tweet));
+    } else {
+        res.status(twreq.status).send({error: JSON.stringify(tweet)});
+    }
 });
 
 app.get('/api/v1/statuses/:id(\\d+)/context', async (req, res) => {
@@ -420,14 +440,80 @@ app.get('/api/v2/search', async (req, res) => {
     res.sendStatus(404);
 });
 
+app.post('/api/v1/statuses', async (req, res) => {
+    const text = req.body.status || '';
+    let reply_target = req.body.in_reply_to_id;
+
+    if (typeof reply_target === 'number' && req.originalJsonBody) {
+        // this is an out-of-spec request from Ivory, so...
+        // there's a high chance that JSON.parse has mangled the tweet ID
+        const json = new TextDecoder().decode(req.originalJsonBody);
+        const match = json.match(/"in_reply_to_id":\s*(\d+)/);
+        if (match) {
+            console.log(`Received numeric in_reply_to_id: ${reply_target}, replacing with: ${match[1]}`)
+            reply_target = match[1];
+        } else {
+            console.warn('Failed to fix in_reply_to_id number', json);
+        }
+    }
+
+    /*
+    tweet vars from web client: (* = publicly documented)
+      *status
+      *card_uri
+      *attachment_url (for quote tweets)
+      *in_reply_to_status_id
+      geo
+      preview
+      conversation_control
+      exclusive_tweet_control_options (super follow related)
+      trusted_friends_control_options[trusted_friends_list_id] (circles)
+      previous_tweet_id (editing)
+      semantic_annotation_ids (wtf is this?)
+      batch_mode (enum for threading)
+      *exclude_reply_user_ids (use with auto_populate_reply_metadata)
+      promotedContent
+      *media_ids
+      media_tags
+     */
+    const params = buildParams(true);
+    params.status = text;
+    if (reply_target) {
+        // Let's not set this for now because Ivory seems to include the @ name in the toot
+        //params.auto_populate_reply_metadata = 'true';
+        params.in_reply_to_status_id = reply_target;
+    }
+
+    const twreq = await req.oauth!.post('https://api.twitter.com/1.1/statuses/update.json', params);
+    const tweet = await twreq.json();
+    if (twreq.status === 200) {
+        res.send(tweetToToot(tweet));
+    } else {
+        // TODO: better/more consistent handling of errors...
+        res.status(twreq.status).send({error: JSON.stringify(tweet)});
+    }
+});
+
+app.delete('/api/v1/statuses/:id(\\d+)', async (req, res) => {
+    const params = buildParams(true);
+    const twreq = await req.oauth!.post(`https://api.twitter.com/1.1/statuses/destroy/${req.params.id}.json`, params);
+    const tweet = await twreq.json();
+    if (twreq.status === 200) {
+        res.send(tweetToToot(tweet));
+    } else {
+        res.status(twreq.status).send({error: JSON.stringify(tweet)});
+    }
+});
+
 app.post('/api/v1/statuses/:id(\\d+)/favourite', async (req, res) => {
     const params = buildParams(true);
     params.id = req.params.id;
     const twreq = await req.oauth!.post('https://api.twitter.com/1.1/favorites/create.json', params);
+    const tweet = await twreq.json();
     if (twreq.status === 200) {
-        res.send(tweetToToot(await twreq.json()));
+        res.send(tweetToToot(tweet));
     } else {
-        res.sendStatus(twreq.status);
+        res.status(twreq.status).send({error: JSON.stringify(tweet)});
     }
 });
 
@@ -435,11 +521,55 @@ app.post('/api/v1/statuses/:id(\\d+)/unfavourite', async (req, res) => {
     const params = buildParams(true);
     params.id = req.params.id;
     const twreq = await req.oauth!.post('https://api.twitter.com/1.1/favorites/destroy.json', params);
+    const tweet = await twreq.json();
     if (twreq.status === 200) {
-        res.send(tweetToToot(await twreq.json()));
+        res.send(tweetToToot(tweet));
     } else {
-        res.sendStatus(twreq.status);
+        res.status(twreq.status).send({error: JSON.stringify(tweet)});
     }
+});
+
+app.post('/api/v1/statuses/:id(\\d+)/reblog', async (req, res) => {
+    const params = buildParams(true);
+    const twreq = await req.oauth!.post(`https://api.twitter.com/1.1/statuses/retweet/${req.params.id}.json`, params);
+    const tweet = await twreq.json();
+    if (twreq.status === 200) {
+        res.send(tweetToToot(tweet));
+    } else {
+        res.status(twreq.status).send({error: JSON.stringify(tweet)});
+    }
+});
+
+app.post('/api/v1/statuses/:id(\\d+)/unreblog', async (req, res) => {
+    const params = buildParams(true);
+    const twreq = await req.oauth!.post(`https://api.twitter.com/1.1/statuses/unretweet/${req.params.id}.json`, params);
+    const tweet = await twreq.json();
+    if (twreq.status === 200) {
+        res.send(tweetToToot(tweet));
+    } else {
+        res.status(twreq.status).send({error: JSON.stringify(tweet)});
+    }
+});
+
+app.get('/api/v1/accounts/search', async (req, res) => {
+    // Ivory uses this to resolve a user by name
+    if (req.body.limit == '1' && req.body.resolve == '1') {
+        const match = /^([^@]+)@([^@]+)$/.exec(req.body.q as string);
+        if (match && match[2] === CONFIG.domain) {
+            const params = buildParams(true);
+            params.screen_name = match[1];
+            const twreq = await req.oauth!.request('GET', 'https://api.twitter.com/1.1/users/show.json', params);
+            const user = await twreq.json();
+            if (twreq.status === 200) {
+                res.send([userToAccount(user)]);
+            } else {
+                res.status(twreq.status).send({error: JSON.stringify(user)});
+            }
+            return;
+        }
+    }
+
+    res.sendStatus(404);
 });
 
 app.listen(8000);

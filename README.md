@@ -30,9 +30,9 @@ Tested with: [Pinafore](https://pinafore.social/), [Elk](https://elk.zone/), [Iv
 | View List Timeline     | ✅*     | May need pagination fixes.                                                                                                                  |
 | View Lists             | ✅*     | Mastodon doesn't let you view other people's lists, so this metadata isn't exposed                                                          |
 | Edit Lists             | ❌      | May be impractical                                                                                                                          |
-| Create Tweets          | ❌      |                                                                                                                                             |
-| Delete Tweets          | ❌      |                                                                                                                                             |
-| Retweet                | ❌      |                                                                                                                                             |
+| Create Tweets          | 🔶     | Text-only tweets and replies supported. No reply controls or scheduling yet                                                                 |
+| Delete Tweets          | ✅      |                                                                                                                                             |
+| Retweet                | ✅      |                                                                                                                                             |
 | Fav/Like Tweets        | ✅      |                                                                                                                                             |
 | View Media             | ✅      | Images, videos, fake-GIFs all supported                                                                                                     |
 | Quote Tweets           | 🔶     | Quote tweets are rewritten to internal URLs (which Ivory is able to show when tapped), but something nicer would be REALLY cool...          |
@@ -53,6 +53,8 @@ Tested with: [Pinafore](https://pinafore.social/), [Elk](https://elk.zone/), [Iv
 
 - Reorganise the codebase
 - Implement more features
+- Implement more Twitter Card types as Mastodon cards where I can
+- Implement entities for profile descriptions (e.g. clickable @ names)
 - Implement missing bits in existing features (alt text, voting in polls, etc)
 - Find out why Elk is unhappy with my implementation of pagination
 - Forward info about the API rate limits
