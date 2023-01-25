@@ -146,7 +146,7 @@ app.get('/api/v1/timelines/home', async (req, res) => {
         const lastRead = BigInt(req.body.min_id as string);
         let maxID: BigInt | null = null;
         params.limit = '200'; // we may as well load Twitter's maximum and save on requests!
-        params.min_id = lastRead - 1n; // fetch the last read tweet as well
+        params.since_id = (lastRead - 1n).toString(); // fetch the last read tweet as well
         let done = false;
 
         console.log(`Tweet update request from ${lastRead} onwards`);
@@ -190,7 +190,16 @@ app.get('/api/v1/timelines/home', async (req, res) => {
             }
         }
 
-        console.log(`Returning ${tweets.length} tweets`);
+        // For debugging, grab the IDs and dates of the oldest and newest tweets in this bundle
+        let oldest = null, newest = null;
+        for (const tweet of tweets) {
+            if (oldest === null || BigInt(tweet.id_str) < BigInt(oldest.id_str))
+                oldest = tweet;
+            if (newest === null || BigInt(tweet.id_str) > BigInt(newest.id_str))
+                newest = tweet;
+        }
+
+        console.log(`Returning ${tweets.length} tweets (${oldest?.id_str}, ${oldest?.created_at} -> ${newest?.id_str}, ${newest?.created_at})`);
     } else {
         // Stick to the original logic
         const twreq = await req.oauth!.get(url, params);
