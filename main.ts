@@ -145,7 +145,7 @@ app.get('/api/v1/timelines/home', async (req, res) => {
 
         const lastRead = BigInt(req.body.min_id as string);
         let maxID: BigInt | null = null;
-        params.limit = '200'; // we may as well load Twitter's maximum and save on requests!
+        params.count = '200'; // we may as well load Twitter's maximum and save on requests!
         params.since_id = (lastRead - 1n).toString(); // fetch the last read tweet as well
         let done = false;
 
