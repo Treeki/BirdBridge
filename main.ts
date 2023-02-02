@@ -445,8 +445,39 @@ app.get('/api/v2/search', async (req, res) => {
             return;
         }
     }
+    else if (req.body.limit == '40' && req.body.type === 'statuses') {
+        const params = buildParams(true);
+        injectPagingInfo(req.body, params);
+        params.count = '100';
+        params.q = req.body.q;
+        params.result_type = 'recent';
+        const twreq = await req.oauth!.request('GET', 'https://api.twitter.com/1.1/search/tweets.json', params);
+        let tweets;
+        tweets = await twreq.json();
+        tweets = tweets.statuses;
+        const toots = tweets.map(tweetToToot);
+        addPageLinksToResponse(new URL(req.originalUrl, CONFIG.root), toots as {id: string}[], res);
+        res.send({accounts: [], hashtags: [], statuses: toots});
+        return;
+    }
 
     res.sendStatus(404);
+});
+
+app.get('/api/v1/timelines/tag/*', async (req, res) => {
+    const params = buildParams(true);
+    injectPagingInfo(req.body, params);
+    params.count = '100';
+    params.q = '#'+req.params[0];
+    params.result_type = 'recent';
+    const twreq = await req.oauth!.request('GET', 'https://api.twitter.com/1.1/search/tweets.json', params);
+    let tweets;
+    tweets = await twreq.json();
+    tweets = tweets.statuses;
+    const toots = tweets.map(tweetToToot);
+    addPageLinksToResponse(new URL(req.originalUrl, CONFIG.root), toots as {id: string}[], res);
+    res.send(toots);
+    return;
 });
 
 app.post('/api/v1/statuses', async (req, res) => {
