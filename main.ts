@@ -460,7 +460,6 @@ app.get('/api/v2/search', async (req, res) => {
         res.send({accounts: [], hashtags: [], statuses: toots});
         return;
     }
-
     res.sendStatus(404);
 });
 
