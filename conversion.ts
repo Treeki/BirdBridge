@@ -170,6 +170,15 @@ export function convertMedia(media: Record<string, any>): Record<string, any> {
     attachment.type = MEDIA_TYPES[media.type] || 'unknown';
     attachment.url = media.media_url_https;
     attachment.preview_url = media.media_url_https;
+    attachment.description = media.ext_alt_text;
+    attachment.meta = {
+        original: {
+            width: media.original_info?.width,
+            height: media.original_info?.height,
+            size: `${media.original_info?.width}x${media.original_info?.height}`,
+            aspect: media.original_info?.width / media.original_info?.height
+        }
+    };
 
     if ((media.type === 'video' || media.type === 'animated_gif') && media.video_info?.variants) {
         // get the best-bitrate mp4 version
