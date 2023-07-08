@@ -185,6 +185,15 @@ export function setup(app: express.Express) {
                     return;
                 }
             }
+        } else if (req.body.grant_type === 'client_credentials') {
+            // We can just return something generic here
+            res.send({
+                'access_token': 'GenericTokenToMakeTheOAuthFlowHappy',
+                'token_type': 'Bearer',
+                'scope': 'read write follow push',
+                'created_at': Math.floor(new Date().getTime() / 1000)
+            });
+            return;
         }
 
         res.sendStatus(401);
