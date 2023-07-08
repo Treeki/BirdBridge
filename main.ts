@@ -429,6 +429,26 @@ app.get('/api/v1/statuses/:id(\\d+)/context', async (req, res) => {
             descendants.push(tweetToToot(tweet, conversation.globalObjects));
     }
 
+    ancestors.sort((a, b) => {
+        const aID = BigInt(a.id);
+        const bID = BigInt(b.id);
+        if (aID < bID)
+            return -1;
+        if (aID > bID)
+            return 1;
+        return 0;
+    });
+
+    descendants.sort((a, b) => {
+        const aID = BigInt(a.id);
+        const bID = BigInt(b.id);
+        if (aID < bID)
+            return -1;
+        if (aID > bID)
+            return 1;
+        return 0;
+    });
+
     res.send({ ancestors, descendants });
 });
 
